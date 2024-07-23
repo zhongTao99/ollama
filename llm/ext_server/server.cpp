@@ -2614,6 +2614,14 @@ static void server_params_parse(int argc, char **argv, server_params &sparams, g
         params.kv_overrides.back().key[0] = 0;
     }
 
+#if defined(GGML_USE_CANN)
+    // when llama.cpp was compiled with CANN, It don't support set split_mode right now
+    // The use of multiple cards is not supported yet.
+    params.split_mode = LLAMA_SPLIT_MODE_NONE;
+    params.main_gpu = 0;
+    LOG_WARNING("llama.cpp was compiled with CANN");
+#endif
+
     if (invalid_param)
     {
         fprintf(stderr, "error: invalid parameter for argument: %s\n", arg.c_str());
