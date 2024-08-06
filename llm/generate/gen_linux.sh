@@ -292,6 +292,7 @@ if [ -z "${OLLAMA_SKIP_ASCEND_GENERATE}" -a -d "${ASCNED_ROOT}" ]; then
     echo "Ascned libraries detected - building dynamic Ascend library"
     init_vars
     source ${ASCNED_ROOT}/set_env.sh --force # set up environment variables for Ascned
+    export LIBRARY_PATH=${ASCEND_TOOLKIT_HOME}/lib64:${LIBRARY_PATH}
     CMAKE_DEFS="${COMMON_CMAKE_DEFS} ${CMAKE_DEFS} -DGGML_CANN=ON -DBUILD_SHARED_LIBS=OFF -DGGML_OPENMP=OFF -DCMAKE_LIBRARY_PATH=${ASCEND_TOOLKIT_HOME}/lib64"
     BUILD_DIR="../build/linux/${ARCH}/ascend"
     build
