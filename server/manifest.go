@@ -107,6 +107,8 @@ func WriteManifest(name model.Name, config Layer, layers []Layer) error {
 		return err
 	}
 
+	slog.Info(fmt.Sprintf("yyyyyyyyyyyyyyyyyyyyy p: %s ", p))
+
 	f, err := os.Create(p)
 	if err != nil {
 		return err

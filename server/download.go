@@ -34,6 +34,7 @@ var (
 )
 
 var blobDownloadManager sync.Map
+var modelDownloadManager sync.Map
 
 type blobDownload struct {
 	Name   string
@@ -142,7 +143,7 @@ func (b *blobDownload) Prepare(ctx context.Context, requestURL *url.URL, opts *r
 	}
 
 	if len(b.Parts) == 0 {
-		resp, err := makeRequestWithRetry(ctx, http.MethodHead, requestURL, nil, nil, opts)
+		resp, err := makeRequestWithRetry(ctx, http.MethodGet, requestURL, nil, nil, opts)
 		if err != nil {
 			return err
 		}
@@ -170,9 +171,15 @@ func (b *blobDownload) Prepare(ctx context.Context, requestURL *url.URL, opts *r
 
 			offset += size
 		}
+		return nil
 	}
 
-	slog.Info(fmt.Sprintf("downloading %s in %d %s part(s)", b.Digest[7:19], len(b.Parts), format.HumanBytes(b.Parts[0].Size)))
+	if len(b.Name) == 0 {
+		slog.Info(fmt.Sprintf("downloading %s in %d %s part(s)", b.Digest[7:19], len(b.Parts), format.HumanBytes(b.Parts[0].Size)))
+	} else {
+		slog.Info(fmt.Sprintf("downloading %s in %d %s part(s)", b.Name, len(b.Parts), format.HumanBytes(b.Parts[0].Size)))
+	}
+
 	return nil
 }
 
@@ -209,6 +216,7 @@ func newBackoff(maxBackoff time.Duration) func(ctx context.Context) error {
 
 func (b *blobDownload) run(ctx context.Context, requestURL *url.URL, opts *registryOptions) error {
 	defer blobDownloadManager.Delete(b.Digest)
+	defer modelDownloadManager.Delete(b.Name)
 	ctx, b.CancelFunc = context.WithCancel(ctx)
 
 	file, err := os.OpenFile(b.Name+"-partial", os.O_CREATE|os.O_RDWR, 0o644)
@@ -256,7 +264,8 @@ func (b *blobDownload) run(ctx context.Context, requestURL *url.URL, opts *regis
 				continue
 			}
 			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusTemporaryRedirect && resp.StatusCode != http.StatusOK {
+
+			if resp.StatusCode != http.StatusTemporaryRedirect && resp.StatusCode != http.StatusFound && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusSeeOther {
 				return nil, fmt.Errorf("unexpected status code %d", resp.StatusCode)
 			}
 			return resp.Location()
@@ -456,6 +465,7 @@ type downloadOpts struct {
 	digest  string
 	regOpts *registryOptions
 	fn      func(api.ProgressResponse)
+	name    string
 }
 
 // downloadBlob downloads a blob from the registry and stores it in the blobs directory
@@ -496,4 +506,47 @@ func downloadBlob(ctx context.Context, opts downloadOpts) (cacheHit bool, _ erro
 	}
 
 	return false, download.Wait(ctx, opts.fn)
+}
+
+// downloadConmmutityModel downloads a model from the Community and stores it in the temp directory
+func downloadCommunityModel(ctx context.Context, opts downloadOpts) (string, error) {
+	fp, err := GetModelTmpPath()
+	if err != nil {
+		return "", err
+	}
+
+	fi, err := os.Stat(fp)
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+	case err != nil:
+		return fp, err
+	default:
+		opts.fn(api.ProgressResponse{
+			Status:    fmt.Sprintf("pulling %s", opts.name),
+			Digest:    opts.name,
+			Total:     fi.Size(),
+			Completed: fi.Size(),
+		})
+		return fp, nil
+	}
+
+	data, ok := modelDownloadManager.LoadOrStore(opts.name, &blobDownload{Name: fp, Digest: opts.name})
+	download := data.(*blobDownload)
+	if !ok {
+		requestURL := opts.mp.BaseURL()
+		slog.Info(fmt.Sprintf("xxxxxxxxxxxxxxxxxxxxxx BaseURL %s", requestURL))
+		path := fmt.Sprintf(opts.mp.subPath, opts.mp.GetNamespaceRepository(), opts.mp.fileName)
+		requestURL = requestURL.JoinPath(path)
+
+		slog.Info(fmt.Sprintf("xxxxxxxxxxxxxxxxxxxxxx requestURL %s", requestURL))
+		if err := download.Prepare(ctx, requestURL, opts.regOpts); err != nil {
+			modelDownloadManager.Delete(opts.name)
+			return fp, err
+		}
+
+		//nolint:contextcheck
+		go download.Run(context.Background(), requestURL, opts.regOpts)
+	}
+
+	return fp, download.Wait(ctx, opts.fn)
 }

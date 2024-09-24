@@ -365,6 +365,9 @@ func CreateModel(ctx context.Context, name model.Name, modelFileDir, quantizatio
 		},
 	}
 
+	// name:registry.ollama.ai/library/Llama3:8b-q4-k-m modelFileDir: . quantization: "
+	slog.Info(fmt.Sprintf("xxxxxxxxxxxxxxxxxxxxxx CreateModel name:%s modelFileDir: %s quantization: %s", name, modelFileDir, quantization))
+
 	var messages []*api.Message
 	parameters := make(map[string]any)
 
@@ -846,6 +849,25 @@ func PushModel(ctx context.Context, name string, regOpts *registryOptions, fn fu
 
 func PullModel(ctx context.Context, name string, regOpts *registryOptions, fn func(api.ProgressResponse)) error {
 	mp := ParseModelPath(name)
+
+	// // huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF:q4_0
+	// slog.Info(fmt.Sprintf("xxxxxxxxxxxxxxxxxxxxxx name %s", name))
+	// // huggingface.co
+	// slog.Info(fmt.Sprintf("xxxxxxxxxxxxxxxxxxxxxx Registry %s", mp.Registry))
+	// // QuantFactory
+	// slog.Info(fmt.Sprintf("xxxxxxxxxxxxxxxxxxxxxx Namespace %s", mp.Namespace))
+	// // q4_0
+	// slog.Info(fmt.Sprintf("xxxxxxxxxxxxxxxxxxxxxx Tag %s", mp.Tag))
+	// // Meta-Llama-3-8B-Instruct-GGUF
+	// slog.Info(fmt.Sprintf("xxxxxxxxxxxxxxxxxxxxxx Repository %s", mp.Repository))
+
+	if IsSupportCommunityRegistry(mp.Registry) {
+		pullErr := PullModelFromCommunityRegistry(ctx, mp, regOpts, fn)
+		if pullErr != nil {
+			return pullErr
+		}
+		return nil
+	}
 
 	// build deleteMap to prune unused layers
 	deleteMap := make(map[string]struct{})

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 
 	"github.com/ollama/ollama/util/bufioutil"
@@ -327,6 +328,7 @@ func DecodeGGML(rs io.ReadSeeker, maxArraySize int) (*GGML, int64, error) {
 	case FILE_MAGIC_GGUF_BE:
 		c = &containerGGUF{ByteOrder: binary.BigEndian, maxArraySize: maxArraySize}
 	default:
+		slog.Info(fmt.Sprintf("yyyyyyyyyyyyyyyyyyyyy magic:%d ", magic))
 		return nil, 0, errors.New("invalid file magic")
 	}
 

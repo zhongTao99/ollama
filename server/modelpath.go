@@ -18,6 +18,8 @@ type ModelPath struct {
 	Namespace      string
 	Repository     string
 	Tag            string
+	fileName       string
+	subPath        string
 }
 
 const (

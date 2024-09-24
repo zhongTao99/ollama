@@ -264,6 +264,12 @@ func (n Name) IsFullyQualified() bool {
 		n.Model,
 		n.Tag,
 	}
+	slog.Info("tttttttttttttttttttttttttt n.Tag %s", n.Tag)
+	// n.Model %s" MiniCPM-V-2_6-gguf:ggml-model-Q2_K.gguf
+	slog.Info("tttttttttttttttttttttttttt n.Model %s", n.Model)
+	slog.Info("tttttttttttttttttttttttttt n.Namespace %s", n.Namespace)
+	// n.Host %s"huggingface.co
+	slog.Info("tttttttttttttttttttttttttt n.Host %s", n.Host)
 	for i, part := range parts {
 		if !isValidPart(partKind(i), part) {
 			return false
@@ -327,7 +333,7 @@ func isValidPart(kind partKind, s string) bool {
 				return false
 			}
 		case ':':
-			if kind != kindHost && kind != kindDigest {
+			if kind != kindHost && kind != kindDigest && kind != kindModel {
 				return false
 			}
 		default:
